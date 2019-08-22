@@ -8,61 +8,116 @@ metadata = {
 	'source':'The exciting mind of David Seyb'
 }
 
-def run_custom_protocol(
-	pipette_type: 'StringSelection...'='p300-Single',
-	dilution_factor: float=2.0,
-	num_of_dilutions: int=4,
-	total_mixing_volume: float=200.0,
-	tip_use_strategy: 'StringSelection...'='use one tip'):
+robot.reset()
 
+tiprack = labware.load('opentrons_96_tiprack_300ul', '11')
+STOCK = labware.load('opentrons_15_tuberack_falcon_15ml_conical', '9')
+BATTERY = labware.load('corning_96_wellplate_360ul_flat', '8')
+CONTROL = labware.load('corning_96_wellplate_360ul_flat', '5')
+TEMPO = labware.load('corning_96_wellplate_360ul_flat', '6')
+
+EVEN_WELLS = 2
+ODD_WELLS = 1
+
+# define some solutions #
+
+cuso4_STOCK = STOCK['A1']
+citric_STOCK = STOCK['A2']
+glycrol_STOCK = STOCK['B1']
+mq_STOCK = STOCK['B2']
+tempo_STOCK = STOCK['C1']
+enzyme_STOCK = STOCK['C2']
+
+# define transfer amounts #
+
+#all
+cuso4_volume = 100
+
+#Battery
+citric_volume = 50
+glycrol_volume = 100
+
+tempo_volume = 100
+enzyme_volume = 30
+
+
+# Control +
+mq_control_volume = 130
+
+#Tempo +
+mq_tempo_volume = 30
+
+
+mix_times = 3
+mix_volume = 200
+
+def run_custom_protocol(	
+	pipette_type: 'StringSe	lection...'='p300-Single',
+	tip_use_strategy: 'StringSelection...'='use one tip'
+	):
+	logging.info("running custom protocol ...")
 	if pipette_type == 'p300-Single':
-		pipette = instruments.P300_Single(
+		p300 = instruments.P300_Single(
             mount='right',
             tip_racks=[tiprack])
 	else:
 		raise ValueError('wrong pipette')
 
-# define some solutions #
+# function will distribute in even or odd wells start at 2 for cathode wells and 1 anode
 
-	cuso4_stock = liquid_input['A1']
-	citric_stock = liquid_input['A2']
-	glycrol_stock = liquid_input['B1']
-	mq_stock = liquid_input['B2']
-	tempo_stock = liquid_input['C1']
-	enzyme_stock = liquid_input['C2']
+	def doEveryOtherWell(use_stock, do_plate = BATTERY, dispence_volume = 300, do = ODD_WELLS, include_rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], mix = False):
+		p300.pick_up_tip()
+		p300vol = 0
+		p300maxVol = p300.max_volume
+		for row in include_rows:
+			for index in range(do,13,2):
+				if p300vol <= 0.0:
+					fills = ( p300maxVol - ( p300maxVol % dispence_volume ) ) / dispence_volume
+					p300.aspirate(fills * dispence_volume, use_stock)
+					p300vol = fills * dispence_volume
+				well = row + str(index)
+				p300.dispense(dispence_volume, do_plate[well])
+				p300vol = p300vol - dispence_volume
+		if(mix):
+			for row in include_rows:
+				for index in range(do,13,2):
+					well = row + str(index)
+					p300.mix(mix_times,mix_volume,do_plate[well])
+		p300.drop_tip()
 
-	cusof_volume = 100
+	def doSetup( plate = BATTERY):
+		#Transfer 1 Add 100μL CuSO4 to all EVEN wells	
+		doEveryOtherWell( use_stock=cuso4_STOCK, do_plate=plate, dispence_volume=cuso4_volume, do=EVEN_WELLS)
+		#Transfer 2 Add 50μL citric acid to all ODD wells
+		doEveryOtherWell( use_stock=citric_STOCK, do_plate=plate, dispence_volume=citric_volume, do=ODD_WELLS)
+		#Add 100μL Glycerol to ODD wells
+		doEveryOtherWell( use_stock=glycrol_STOCK, do_plate=plate, dispence_volume=glycrol_volume, do=ODD_WELLS)
 
-# add cusof to all even numbered cells
-	for index in range(2,12,2):
-		for row in ['A', 'B']:
-			well = row + str(index)
-				logging.info(liquid_output[well])
-			pipette.distribute(cusof_volume, cuso4_stock, liquid_output[well])
-#
-#	for col in liquid_output.cols('2', length=(num_of_dilutions)):
-#		logging.info(col)
-#		pipette.distribute(diluent_volume, cuso4_stock, col)
-#		logging.info(col)
-#		# col = col + 1
+	doSetup(BATTERY)
+	doSetup(CONTROL)
+	doSetup(TEMPO)
 
-#	for row in liquid_output.rows():
-#		pipette.transfer(
-#			transfer_volume,
-#			row.wells('1', to=(num_of_dilutions-1)),
-#			row.wells('2', to=(num_of_dilutions)),
-#			new_tip='once',
-#			mix_after=(3, total_mixing_volume / 2))
-#
+	# Transfer 4 and Mix Control Plate
+	#Add 130μL MQ to ODD well on the control, mix after each addition
+	doEveryOtherWell(mq_STOCK, CONTROL, mq_control_volume, do=ODD_WELLS, mix=True)
+	
+	#Tempo only
+	#Add 30μL MQ to ODD wells
+	doEveryOtherWell(mq_STOCK,TEMPO, mq_tempo_volume, do=ODD_WELLS, mix=False)
+	#Add 100μL TEMPO-NH2 to ODD wells, mix after each solution
+	doEveryOtherWell(tempo_STOCK,TEMPO, tempo_volume, do=ODD_WELLS, mix=True)
 
-# logging.info(__name__)
-if __name__ == '__main__' or __name__ == 'builtins':
-	robot.reset()
+	#Battery
+	#Add 100μL TEMPO-NH2 to ODD wells, mix after each solution
+	doEveryOtherWell(tempo_STOCK,BATTERY, tempo_volume, do=ODD_WELLS, mix=False)
+	#Add 30μL  enzyme to ODD wells
+	doEveryOtherWell(mq_STOCK,BATTERY, enzyme_volume, do=ODD_WELLS, mix=True)
+	
 
-	# labware from https://labware.opentrons.com/
+	
 
-	tiprack = labware.load('opentrons_96_tiprack_300ul', '11')
-	liquid_input = labware.load('opentrons_15_tuberack_falcon_15ml_conical', '9')
-	liquid_output = labware.load('corning_96_wellplate_360ul_flat', '3')
 
-	run_custom_protocol()
+
+
+
+run_custom_protocol()
