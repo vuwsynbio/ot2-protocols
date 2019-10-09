@@ -1,4 +1,4 @@
-from opentrons import labware, instruments
+from opentrons import labware, instruments, robot
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -10,25 +10,24 @@ metadata = {
 
 def load_labware():
     wells96 = labware.load('corning_96_wellplate_360ul_flat', '1')
-    liquid_input = labware.load('tube-rack-15_50ml', '2')
+    liquid_input = labware.load('opentrons_10_tuberack_nest_4x50ml_6x15ml_conical', '2')
     tiprack300 = labware.load('tiprack-200ul', '3')
-    tiprack10 = labware.load('tiprack-10ul', '4')
 
     pipette300 = instruments.P300_Single(
         mount='left',
         tip_racks=[tiprack300])
 
-    pipette10 = instruments.P10_Single(
-        mount='right',
-        tip_racks=[tiprack10])
+    # pipette10 = instruments.P10_Single(
+    #     mount='right',
+    #     tip_racks=[tiprack10])
 
     return (pipette300,
-            pipette10,
-            liquid_input['A1'],  # trash
-            liquid_input['A2'],  # buffer source,
-            liquid_input['A3'],  # nad source
-            liquid_input['A4'],  # enzyme source
-            liquid_input['A5'],  # substratesource
+            # pipette10,
+            liquid_input['A3'],  # trash
+            liquid_input['A4'],  # buffer source,
+            liquid_input['A1'],  # nad source
+            liquid_input['A2'],  # enzyme source
+            liquid_input['B1'],  # substrate source
             wells96)  # 96 well plate
 
 def serial_dilution(pipette, substrate_source, dilutant_source, output, trash,
@@ -60,14 +59,14 @@ def run_custom_protocol(
         replicates: int=6,
         total_mixing_volume: float=200.0,
         substrate_conc: float=1,  # 1M conc
-        nad_conc: float=10.0,  # 10mM of NAD
-        v_enzyme: float=5.0, # 5uL of enzyme
+        nad_conc: float=20.0,  # 10mM of NAD
+        v_enzyme: float=50.0, # 5uL of enzyme
         ):
 
     transfer_volume = total_mixing_volume/dilution_factor
     diluent_volume = total_mixing_volume - transfer_volume
 
-    p300, p10, trash, buffer_s, nad_s, enzyme_s, substrate_s, wells96 = load_labware()
+    p300, trash, buffer_s, nad_s, enzyme_s, substrate_s, wells96 = load_labware()
 
     # serial dilution of the substrate
     serial_dilution(p300, substrate_s, buffer_s, wells96, trash, 100, 4, 0.5)
@@ -76,8 +75,8 @@ def run_custom_protocol(
     p300.distribute(nad_conc, nad_s, wells96.wells())
 
     # add 5uL of enzyme to each well
-    p10.distribute(v_enzyme, enzyme_s, wells96.wells())
+    p300.distribute(v_enzyme, enzyme_s, wells96.wells())
 
 
-# if __name__ == '__main__':
-run_custom_protocol()
+if __name__ == '__main__' or __name__ == 'builtins':
+	run_custom_protocol()
