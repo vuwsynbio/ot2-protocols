@@ -1,7 +1,7 @@
 from opentrons import labware, instruments
 import logging
 logging.basicConfig(level=logging.DEBUG)
- 
+
 metadata = {
 	'protocolName':'Customizable Serial Dilution',
 	'author':'Opentrons <protocol@opentrons.com>',
@@ -10,7 +10,7 @@ metadata = {
 
 liquid_input = labware.load('tube-rack-15_50ml', '2')
 liquid_trash = liquid_input['A2']
-liquid_output = labware.load('tube-rack-2ml', '1')  
+liquid_output = labware.load('tube-rack-2ml', '1')
 # couldnt load the  'tube-rack-1.5ml'
 tiprack = labware.load('tiprack-200ul', '3')
 
@@ -20,7 +20,7 @@ def run_custom_protocol(
 	num_of_dilutions: int=4,
 	total_mixing_volume: float=200.0,
 	tip_use_strategy: 'StringSelection...'='use one tip'):
-	
+
 	pip_name = pipette_type.split('-')[1]
 
 	if pipette_type == 'p300-Single':
@@ -35,7 +35,7 @@ def run_custom_protocol(
 
 	logging.info(pipette)
 	pipette.pick_up_tip()
-	
+
 	for col in []: #liquid_output.cols('2', length=(num_of_dilutions)):
 		logging.info(col)
 
@@ -53,5 +53,5 @@ def run_custom_protocol(
 			row.wells(num_of_dilutions),
 			liquid_trash)
 
-
-run_custom_protocol()
+if __name__ == '__main__':
+    run_custom_protocol()
